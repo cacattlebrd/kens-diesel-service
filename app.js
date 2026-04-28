@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.0.6';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -1755,7 +1755,8 @@ function renderInvoiceMockHTML(inv, cust) {
 }
 
 // ---------------- PDF GENERATION (AUTO-SHOP WORK ORDER STYLE) ----------------
-function generatePDF(inv) {
+// returnBlob: if true, returns { blob, filename } and skips download
+function generatePDF(inv, returnBlob) {
   if (!window.jspdf || !window.jspdf.jsPDF) { showToast('PDF library not loaded', true); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
@@ -2146,62 +2147,108 @@ function generatePDF(inv) {
 
   const filename = (inv.number || 'invoice').replace(/[^a-z0-9-]/gi, '_') +
     '_' + (cust ? cust.name.replace(/[^a-z0-9]/gi, '_') : 'customer') + '.pdf';
+
+  if (returnBlob) {
+    const blob = doc.output('blob');
+    return { blob, filename };
+  }
+
   doc.save(filename);
   showToast('PDF saved: ' + filename);
 }
 
 // ---------------- EMAIL INVOICE ----------------
-function emailInvoice(inv) {
+async function emailInvoice(inv) {
   const cust = data.customers.find(c => c.id === inv.customerId);
   const s = data.settings;
 
-  // Build the body
+  // Build a short equipment overview from the tickets on this invoice
   const ticketsForInvoice = (inv.ticketIds || []).map(id => data.tickets.find(t => t.id === id)).filter(Boolean);
-  const jobLines = ticketsForInvoice.map(t => {
+  const equipList = ticketsForInvoice.map(t => {
     const eq = t.equipmentInfo || {};
-    const eqStr = `${eq.year || ''} ${eq.makeModel || ''}`.trim();
-    return `  • ${t.number} — ${t.title || ''}${eqStr ? ' (' + eqStr + ')' : ''}`;
-  }).join('\n');
+    const yearMake = `${eq.year || ''} ${eq.makeModel || ''}`.trim();
+    return yearMake || t.title || '';
+  }).filter(Boolean);
 
+  // Build a one-line summary of equipment for the body
+  let equipSummary;
+  if (equipList.length === 0) {
+    equipSummary = 'requested work';
+  } else if (equipList.length === 1) {
+    equipSummary = equipList[0];
+  } else if (equipList.length === 2) {
+    equipSummary = equipList[0] + ' and ' + equipList[1];
+  } else {
+    equipSummary = equipList[0] + ' and other equipment';
+  }
+
+  // Greeting — first word of customer name
   const greeting = cust && cust.name
-    ? 'Hi ' + cust.name.split(' ')[0].split(',')[0] + ','
+    ? 'Hi ' + cust.name.split(/[\s,]/)[0] + ','
     : 'Hi,';
+
+  // Date for subject (use invoice date, formatted clean)
+  const dateForSubject = fmtDate(inv.sentDate);
+
+  const subject = `${inv.number} — Mechanical work performed on ${dateForSubject}`;
 
   const body = `${greeting}
 
-Attached is invoice ${inv.number} for ${fmtMoney(inv.total)}.
+Attached is invoice ${inv.number} (${fmtMoney(inv.total)}) for work performed on ${dateForSubject} on ${equipSummary}. Full details on the invoice.
 
-${jobLines ? 'Work performed:\n' + jobLines + '\n' : ''}
-Easiest way to pay (no fees):
-  Zelle email: muzzleflash9600@gmail.com
-  Zelle phone: (210) 529-0883
-  Name: Kenneth Stevens
+------------------------------------------
+PAYMENT OPTIONS (no fees on Zelle)
+------------------------------------------
+Zelle email:   muzzleflash9600@gmail.com
+Zelle phone:   (210) 529-0883
+Zelle name:    Kenneth Stevens
 
 Or mail check payable to:
-  ${s.ownerName}
-  ${(s.address || '').split('\n').join(', ')}
+   ${s.ownerName}
+   ${(s.address || '').split('\n').join('\n   ')}
+------------------------------------------
 
-Thanks for your business —
+Thanks for your business,
+
 ${s.ownerName.split(' ')[0]}
+${s.businessName}
 ${s.phone || ''}
-${s.email || ''}
+${s.email || ''}`;
 
-P.S. — please attach the PDF that was just downloaded before sending this email.`;
-
-  const subject = `Invoice ${inv.number} — ${s.businessName}`;
   const to = cust && cust.email ? cust.email : '';
-
-  const mailto = 'mailto:' + encodeURIComponent(to) +
-    '?subject=' + encodeURIComponent(subject) +
-    '&body=' + encodeURIComponent(body);
-
   if (!to) {
     showToast('No email on file for this customer — add one in Customers', true);
     return;
   }
-  // Try opening — most mobile devices open the default mail app
+
+  // ---- Try the Web Share API path (iPhone/Android — attaches PDF) ----
+  try {
+    const result = generatePDF(inv, true); // returns { blob, filename }
+    if (result && result.blob && navigator.canShare) {
+      const file = new File([result.blob], result.filename, { type: 'application/pdf' });
+      const shareData = { files: [file], title: subject, text: body };
+      if (navigator.canShare(shareData)) {
+        showToast('Opening share sheet — pick Mail');
+        await navigator.share(shareData);
+        return;
+      }
+    }
+  } catch (err) {
+    // User cancelled the share, or the share API threw — fall through to mailto
+    if (err && err.name === 'AbortError') {
+      // User explicitly cancelled — no need to fall through
+      return;
+    }
+    console.warn('Web Share failed, falling back:', err);
+  }
+
+  // ---- Fallback: download PDF + open mailto (manual attach) ----
+  generatePDF(inv); // saves to device
+  const mailto = 'mailto:' + encodeURIComponent(to) +
+    '?subject=' + encodeURIComponent(subject) +
+    '&body=' + encodeURIComponent(body);
   window.location.href = mailto;
-  showToast('Opening email — attach the PDF before sending');
+  showToast('PDF downloaded — attach it to the email');
 }
 
 // ---------------- SETTINGS ----------------

@@ -1,4 +1,4 @@
 {
-  "version": "1.0.4",
-  "notes": "Fixed labor table overlap, added Email Customer button, Zelle pay info, auto-update, diagnostic export"
+  "version": "1.0.6",
+  "notes": "Email button now auto-attaches the PDF via the share sheet on iPhone"
 }
