@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ken's Diesel Service">
+  <meta name="theme-color" content="#0d1626">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>Ken's Diesel Service</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="header-inner">
+        <h1 id="header-title">Ken's Diesel Service</h1>
+        <div class="header-right">
+          <button id="sync-btn" class="sync-status" title="Sign in to sync">Sign In</button>
+          <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <!-- ============ DASHBOARD ============ -->
+      <section id="screen-dashboard" class="screen active">
+        <div class="balance-card">
+          <div class="balance-label">You're owed</div>
+          <div class="balance-amount" id="total-owed">$0.00</div>
+          <div class="balance-sub" id="open-invoice-count">0 open invoices</div>
+        </div>
+
+        <div class="quick-actions">
+          <button class="big-btn primary" data-nav="ticket-new">
+            <div class="big-btn-icon">🔧</div>
+            <div class="big-btn-label">New Ticket</div>
+          </button>
+          <button class="big-btn primary" data-nav="invoice-builder">
+            <div class="big-btn-icon">📄</div>
+            <div class="big-btn-label">New Invoice</div>
+          </button>
+          <button class="big-btn" data-nav="tickets">
+            <div class="big-btn-icon">📋</div>
+            <div class="big-btn-label">All Tickets</div>
+          </button>
+          <button class="big-btn" data-nav="customers">
+            <div class="big-btn-icon">👥</div>
+            <div class="big-btn-label">Customers</div>
+          </button>
+          <button class="big-btn" data-nav="history">
+            <div class="big-btn-icon">📚</div>
+            <div class="big-btn-label">History</div>
+          </button>
+        </div>
+
+        <div class="section">
+          <h2>Open Tickets</h2>
+          <div id="open-tickets" class="list-container">
+            <div class="empty-state">No open tickets. Tap "New Ticket" to start one.</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Recent Invoices</h2>
+          <div id="recent-invoices" class="list-container">
+            <div class="empty-state">No invoices yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TICKETS LIST ============ -->
+      <section id="screen-tickets" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-nav="dashboard">← Back</button>
+          <h2>Job Tickets</h2>
+          <button class="add-btn" data-nav="ticket-new">+ New</button>
+        </div>
+        <div class="filter-bar">
+          <select id="tickets-filter-customer">
+            <option value="">All Customers</option>
+          </select>
+          <select id="tickets-filter-status">
+            <option value="open">Open Only</option>
+            <option value="closed">Closed Only</option>
+            <option value="">All</option>
+          </select>
+        </div>
+        <div id="tickets-list" class="list-container"></div>
+      </section>
+
+      <!-- ============ TICKET EDITOR ============ -->
+      <section id="screen-ticket" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" id="ticket-back-btn">← Back</button>
+          <h2 id="ticket-screen-title">New Ticket</h2>
+        </div>
+
+        <form id="ticket-form" class="form" onsubmit="return false;">
+          <input type="hidden" id="ticket-id">
+
+          <label>Customer *
+            <select id="tk-customer" required></select>
+          </label>
+
+          <div class="row">
+            <label class="half">Ticket #
+              <input type="text" id="tk-number" readonly placeholder="(auto)">
+            </label>
+            <label class="half">Status
+              <select id="tk-status">
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+              </select>
+            </label>
+          </div>
+
+          <label>Job Title *
+            <input type="text" id="tk-title" placeholder="e.g., Bobcat S450 Engine Rebuild" required>
+          </label>
+
+          <label>Job Code
+            <input type="text" id="tk-job-code" placeholder="e.g., 8520/2368">
+          </label>
+
+          <details class="collapse-block">
+            <summary>Equipment Info</summary>
+            <div class="row">
+              <label class="half">Year
+                <input type="text" id="tk-eq-year">
+              </label>
+              <label class="half">Make / Model
+                <input type="text" id="tk-eq-makemodel" placeholder="e.g., Bobcat S450">
+              </label>
+            </div>
+            <div class="row">
+              <label class="half">Serial / VIN
+                <input type="text" id="tk-eq-serial">
+              </label>
+              <label class="half">Odometer / Hours
+                <input type="text" id="tk-eq-odometer">
+              </label>
+            </div>
+            <label>License Plate
+              <input type="text" id="tk-eq-plate">
+            </label>
+          </details>
+
+          <details class="collapse-block">
+            <summary>Complaint / Diagnosis / Work Summary</summary>
+            <label>Complaint (what's wrong)
+              <textarea id="tk-complaint" rows="2"></textarea>
+            </label>
+            <label>Diagnosis (what you found)
+              <textarea id="tk-diagnosis" rows="2"></textarea>
+            </label>
+            <label>Work Summary (what you did)
+              <textarea id="tk-work-summary" rows="2"></textarea>
+            </label>
+          </details>
+
+          <div class="form-actions">
+            <button type="button" id="tk-save-btn" class="btn btn-primary">Save Ticket</button>
+          </div>
+        </form>
+
+        <!-- LINE ITEMS PANEL (only shown after ticket has an ID) -->
+        <div id="ticket-lines-panel" style="display:none;">
+          <div class="totals-card" style="margin: 18px 0;">
+            <div class="totals-row"><span>Open (unbilled):</span><span id="tk-open-total">$0.00</span></div>
+            <div class="totals-row"><span>Already billed:</span><span id="tk-billed-total">$0.00</span></div>
+            <div class="totals-row total"><span>Ticket total:</span><span id="tk-grand-total">$0.00</span></div>
+          </div>
+
+          <div class="section">
+            <h2>Labor</h2>
+            <div id="tk-labor-list" class="list-container"></div>
+            <button type="button" class="btn btn-small" data-add-line="labor">+ Add Labor</button>
+          </div>
+
+          <div class="section">
+            <h2>Parts &amp; Materials</h2>
+            <div id="tk-parts-list" class="list-container"></div>
+            <button type="button" class="btn btn-small" data-add-line="part">+ Add Part</button>
+          </div>
+
+          <div class="section">
+            <h2>Mileage / Travel</h2>
+            <div id="tk-mileage-list" class="list-container"></div>
+            <button type="button" class="btn btn-small" data-add-line="mileage">+ Add Mileage</button>
+          </div>
+
+          <div class="section">
+            <h2>Misc / Custom</h2>
+            <div id="tk-misc-list" class="list-container"></div>
+            <button type="button" class="btn btn-small" data-add-line="misc">+ Add Misc</button>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="tk-invoice-btn" class="btn btn-primary">Generate Invoice from Ticket</button>
+            <button type="button" id="tk-clone-btn" class="btn btn-secondary">Clone as New Ticket</button>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="tk-toggle-status-btn" class="btn btn-secondary">Close Ticket</button>
+            <button type="button" id="tk-delete-btn" class="btn btn-danger">Delete Ticket</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ LINE ITEM EDITOR (modal-style) ============ -->
+      <section id="screen-line" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" id="line-back-btn">← Back</button>
+          <h2 id="line-title">Edit Line Item</h2>
+        </div>
+        <form id="line-form" class="form" onsubmit="return false;">
+          <input type="hidden" id="line-ticket-id">
+          <input type="hidden" id="line-id">
+          <input type="hidden" id="line-type">
+
+          <label>Date
+            <input type="date" id="line-date">
+          </label>
+
+          <!-- Labor only fields -->
+          <div id="line-labor-fields">
+            <div class="row">
+              <label class="half">Start Time
+                <input type="time" id="line-start">
+              </label>
+              <label class="half">End Time
+                <input type="time" id="line-end">
+              </label>
+            </div>
+          </div>
+
+          <label id="line-desc-label">Description
+            <textarea id="line-desc" rows="3"></textarea>
+          </label>
+
+          <div class="row">
+            <label class="half" id="line-qty-label">Qty
+              <input type="number" id="line-qty" step="0.25">
+            </label>
+            <label class="half">Rate
+              <input type="number" id="line-rate" step="0.01">
+            </label>
+          </div>
+
+          <div id="line-markup-row" class="row" style="display:none;">
+            <label class="half">Markup %
+              <input type="number" id="line-markup" min="0" max="100" step="1" value="0">
+            </label>
+            <label class="half" style="display:flex;flex-direction:row;align-items:center;gap:8px;font-weight:normal;">
+              <input type="checkbox" id="line-billable" checked>
+              Billable
+            </label>
+          </div>
+
+          <div id="line-billable-row" class="row">
+            <label style="display:flex;flex-direction:row;align-items:center;gap:8px;font-weight:normal;">
+              <input type="checkbox" id="line-billable-2" checked>
+              Billable to customer
+            </label>
+          </div>
+
+          <div class="totals-card" style="margin-top:8px;">
+            <div class="totals-row total"><span>Line Total:</span><span id="line-total">$0.00</span></div>
+          </div>
+
+          <div id="line-billed-banner" class="billed-banner" style="display:none;">
+            <strong>Billed on <span id="line-billed-on"></span></strong>
+            <button type="button" id="line-unbill-btn" class="btn btn-small btn-warn" style="margin-top:6px;">Unbill This Item</button>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="line-delete-btn" class="btn btn-danger" style="display:none;">Delete</button>
+            <button type="button" id="line-save-btn" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ CUSTOMERS ============ -->
+      <section id="screen-customers" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-nav="dashboard">← Back</button>
+          <h2>Customers</h2>
+          <button class="add-btn" id="add-customer-btn">+ Add</button>
+        </div>
+        <div id="customers-list" class="list-container"></div>
+      </section>
+
+      <section id="screen-customer-edit" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-nav="customers">← Back</button>
+          <h2 id="customer-edit-title">Add Customer</h2>
+        </div>
+        <form id="customer-form" class="form" onsubmit="return false;">
+          <input type="hidden" id="customer-id">
+          <label>Customer Name *
+            <input type="text" id="cust-name" required>
+          </label>
+          <label>Short Code (used as ticket prefix, e.g. "CA" → CA-TKT-001) *
+            <input type="text" id="cust-shortcode" maxlength="10" required placeholder="CA, ACME, JIM, etc.">
+          </label>
+          <label>Address
+            <textarea id="cust-address" rows="3"></textarea>
+          </label>
+          <label>Phone
+            <input type="tel" id="cust-phone">
+          </label>
+          <label>Email
+            <input type="email" id="cust-email">
+          </label>
+          <label>EIN #
+            <input type="text" id="cust-ein">
+          </label>
+          <label>Notes
+            <textarea id="cust-notes" rows="2"></textarea>
+          </label>
+          <div class="form-actions">
+            <button type="button" id="customer-delete" class="btn btn-danger" style="display:none;">Delete</button>
+            <button type="button" id="customer-save-btn" class="btn btn-primary">Save Customer</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ INVOICE BUILDER ============ -->
+      <section id="screen-invoice-builder" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-nav="dashboard">← Back</button>
+          <h2 id="invoice-builder-title">New Invoice</h2>
+        </div>
+        <div id="revised-banner" style="display:none;" class="revised-banner">
+          <label style="flex-direction:row; align-items:center; gap:8px; font-weight:normal; font-size:14px;">
+            <input type="checkbox" id="mark-revised-checkbox">
+            <span>Mark this as a <strong>Revised</strong> invoice (already sent to customer)</span>
+          </label>
+        </div>
+        <form id="invoice-form" class="form" onsubmit="return false;">
+          <input type="hidden" id="invoice-id">
+
+          <label>Customer
+            <select id="inv-customer" required></select>
+          </label>
+
+          <div class="section">
+            <h2>Add Tickets to This Invoice</h2>
+            <div style="font-size: 13px; color: #555; margin-bottom: 10px; padding: 8px 10px; background: #ebf5fc; border-left: 3px solid #00bfff; border-radius: 4px;">
+              Check one or more tickets below. Each checked ticket's open billable items will be added to the invoice. You can pick as many as you want.
+            </div>
+            <div id="inv-tickets-list" class="list-container">
+              <div class="empty-state">Pick a customer above to see their open tickets.</div>
+            </div>
+            <div id="inv-tickets-summary" style="margin-top: 8px; font-size: 13px; color: #0d1626; font-weight: 600; display: none;"></div>
+          </div>
+
+          <div class="section">
+            <h2>Line Items on Invoice</h2>
+            <div id="inv-lines-list"></div>
+            <div class="line-item-actions">
+              <button type="button" id="add-chargeback-btn" class="btn btn-small btn-warn">+ Chargeback</button>
+              <button type="button" id="add-custom-line-btn" class="btn btn-small">+ Custom Line</button>
+            </div>
+          </div>
+
+          <div class="totals-card">
+            <div class="totals-row"><span>Labor:</span><span id="inv-sub-labor">$0.00</span></div>
+            <div class="totals-row"><span>Parts:</span><span id="inv-sub-parts">$0.00</span></div>
+            <div class="totals-row"><span>Mileage:</span><span id="inv-sub-mileage">$0.00</span></div>
+            <div class="totals-row"><span>Misc:</span><span id="inv-sub-misc">$0.00</span></div>
+            <div class="totals-row"><span>Subtotal:</span><span id="inv-subtotal">$0.00</span></div>
+            <div class="totals-row"><span>Chargebacks:</span><span id="inv-chargeback">$0.00</span></div>
+            <div class="totals-row total"><span>TOTAL:</span><span id="inv-total">$0.00</span></div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="preview-pdf-btn" class="btn btn-secondary">Preview PDF</button>
+            <button type="button" id="invoice-submit-btn" class="btn btn-primary">Save &amp; Generate PDF</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ HISTORY ============ -->
+      <section id="screen-history" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-nav="dashboard">← Back</button>
+          <h2>Invoice History</h2>
+        </div>
+        <div class="filter-bar">
+          <select id="history-filter-customer">
+            <option value="">All Customers</option>
+          </select>
+          <select id="history-filter-status">
+            <option value="">All Statuses</option>
+            <option value="sent">Sent (Unpaid)</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <div class="balance-card small">
+          <div class="balance-label">Outstanding</div>
+          <div class="balance-amount" id="history-total-owed">$0.00</div>
+        </div>
+        <div id="history-list" class="list-container"></div>
+      </section>
+
+      <section id="screen-invoice-detail" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-nav="history">← Back</button>
+          <h2 id="invoice-detail-title">Invoice</h2>
+        </div>
+        <div id="invoice-detail-content"></div>
+        <div class="form-actions">
+          <button id="edit-invoice-btn" class="btn btn-secondary">Edit Invoice</button>
+          <button id="redownload-pdf-btn" class="btn btn-secondary">Re-download PDF</button>
+        </div>
+        <div class="form-actions">
+          <button id="mark-paid-btn" class="btn btn-primary">Mark as Paid</button>
+        </div>
+        <div class="form-actions">
+          <button id="delete-invoice-btn" class="btn btn-danger">Delete Invoice</button>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section id="screen-settings" class="screen">
+        <div class="screen-header">
+          <button class="back-btn" data-nav="dashboard">← Back</button>
+          <h2>Settings</h2>
+        </div>
+        <form id="settings-form" class="form" onsubmit="return false;">
+          <h3>Your Business Info</h3>
+          <label>Business Name
+            <input type="text" id="set-business-name">
+          </label>
+          <label>Owner Name (for checks)
+            <input type="text" id="set-owner-name">
+          </label>
+          <label>Mailing Address
+            <textarea id="set-address" rows="3"></textarea>
+          </label>
+          <label>Email
+            <input type="email" id="set-email">
+          </label>
+          <label>Phone
+            <input type="tel" id="set-phone">
+          </label>
+          <label>Payment Instructions (shown on invoices)
+            <textarea id="set-payment-instructions" rows="4"></textarea>
+          </label>
+
+          <h3>Data</h3>
+          <button type="button" id="export-backup-btn" class="btn btn-secondary">Download Backup (JSON)</button>
+          <button type="button" id="import-backup-btn" class="btn btn-secondary">Import Backup</button>
+          <input type="file" id="import-file" accept=".json" style="display:none;">
+
+          <div class="form-actions">
+            <button type="button" id="settings-save-btn" class="btn btn-primary">Save Settings</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
