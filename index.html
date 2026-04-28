@@ -416,6 +416,9 @@
         </div>
         <div id="invoice-detail-content"></div>
         <div class="form-actions">
+          <button id="email-customer-btn" class="btn btn-primary">📧 Email to Customer</button>
+        </div>
+        <div class="form-actions">
           <button id="edit-invoice-btn" class="btn btn-secondary">Edit Invoice</button>
           <button id="redownload-pdf-btn" class="btn btn-secondary">Re-download PDF</button>
         </div>
@@ -459,8 +462,15 @@
           <button type="button" id="import-backup-btn" class="btn btn-secondary">Import Backup</button>
           <input type="file" id="import-file" accept=".json" style="display:none;">
 
+          <h3>Help / Support</h3>
+          <div style="font-size:13px; color:#555; margin-bottom:10px;">If something's broken, tap the button below. It downloads a diagnostic file and opens an email to Chad with troubleshooting details.</div>
+          <button type="button" id="diag-export-btn" class="btn btn-warn">📋 Send Diagnostic to Chad</button>
+
           <div class="form-actions">
             <button type="button" id="settings-save-btn" class="btn btn-primary">Save Settings</button>
+          </div>
+          <div style="margin-top:24px; padding-top:16px; border-top:1px solid #e0e0d8; text-align:center; font-size:12px; color:#888;">
+            App version <span id="app-version">—</span>
           </div>
         </form>
       </section>

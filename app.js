@@ -1,6 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
+const APP_VERSION = '1.0.4';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -18,13 +19,94 @@ let data = {
     address: "222 E Mitchell St apt 5213\nSan Antonio, TX 78210",
     email: "kensmechanicservice@gmail.com",
     phone: "(210) 529-0883",
-    paymentInstructions: "Make checks payable to: Kenneth Wayne Stevens Jr\nMail to: 222 E Mitchell St apt 5213, San Antonio, TX 78210",
+    paymentInstructions: "Pay by Zelle (no fees):\n  Email: muzzleflash9600@gmail.com\n  Phone: (210) 529-0883\nName on Zelle: Kenneth Stevens\n\nOR mail check payable to: Kenneth Wayne Stevens Jr\n222 E Mitchell St apt 5213, San Antonio, TX 78210",
     nextInvoiceNumber: 1
   }
 };
 
 // In-progress invoice line items (working buffer)
 let currentInvoiceLines = [];
+
+// ---------------- ERROR LOG (for diagnostics) ----------------
+const errorLog = [];
+const MAX_ERRORS = 20;
+window.addEventListener('error', e => {
+  errorLog.push({
+    time: new Date().toISOString(),
+    msg: e.message,
+    src: e.filename + ':' + e.lineno + ':' + e.colno,
+    stack: e.error && e.error.stack ? String(e.error.stack).slice(0, 800) : null
+  });
+  if (errorLog.length > MAX_ERRORS) errorLog.shift();
+});
+window.addEventListener('unhandledrejection', e => {
+  errorLog.push({
+    time: new Date().toISOString(),
+    msg: 'Unhandled promise: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)).slice(0, 200),
+    src: 'promise'
+  });
+  if (errorLog.length > MAX_ERRORS) errorLog.shift();
+});
+
+// ---------------- AUTO-UPDATE CHECK ----------------
+// Checks for a newer version on GitHub Pages. If found, shows a banner
+// that lets the user reload to get the new version (busts cache).
+async function checkForUpdate() {
+  try {
+    // Cache-bust by appending a timestamp
+    const url = './version.json?_=' + Date.now();
+    const res = await fetch(url, { cache: 'no-cache' });
+    if (!res.ok) return;
+    const remote = await res.json();
+    if (!remote || !remote.version) return;
+    if (compareVersions(remote.version, APP_VERSION) > 0) {
+      showUpdateBanner(remote.version, remote.notes || '');
+    }
+  } catch (e) {
+    // Silent — no internet or version.json missing is fine
+  }
+}
+
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const da = pa[i] || 0, db = pb[i] || 0;
+    if (da > db) return 1;
+    if (da < db) return -1;
+  }
+  return 0;
+}
+
+function showUpdateBanner(newVersion, notes) {
+  // Don't show if already showing
+  if (document.getElementById('update-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.innerHTML = `
+    <div style="background:#0d1626; color:#00bfff; padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:2px solid #00bfff; font-size:14px; font-weight:600; cursor:pointer; position:sticky; top:0; z-index:101;">
+      <span style="font-size:18px;">⬇</span>
+      <div style="flex:1;">
+        <div>Update Available — v${newVersion}</div>
+        ${notes ? `<div style="font-size:12px; font-weight:normal; color:#a0d8ef; margin-top:2px;">${notes}</div>` : ''}
+      </div>
+      <button id="update-now-btn" style="background:#00bfff; color:#0d1626; border:none; padding:8px 14px; border-radius:6px; font-weight:700; cursor:pointer; font-size:13px;">Update Now</button>
+    </div>
+  `;
+  document.body.insertBefore(banner, document.body.firstChild);
+  document.getElementById('update-now-btn').onclick = forceUpdate;
+}
+
+function forceUpdate() {
+  // Hard reload, bypassing cache
+  showToast('Updating...');
+  setTimeout(() => {
+    // location.reload(true) is deprecated but still works in many browsers
+    // Adding a query param forces a full re-fetch of all assets
+    const url = window.location.href.split('?')[0] + '?v=' + Date.now();
+    window.location.href = url;
+  }, 400);
+}
 
 // ---------------- DRIVE SYNC ----------------
 // Paste the Client ID from Google Cloud Console here.
@@ -1413,6 +1495,7 @@ function openInvoiceDetail(id) {
   document.getElementById('invoice-detail-content').innerHTML = renderInvoiceMockHTML(inv, cust);
 
   document.getElementById('redownload-pdf-btn').onclick = () => generatePDF(inv);
+  document.getElementById('email-customer-btn').onclick = () => emailInvoice(inv);
   document.getElementById('mark-paid-btn').textContent = inv.status === 'paid' ? 'Mark as Unpaid' : 'Mark as Paid';
   document.getElementById('mark-paid-btn').onclick = () => {
     inv.status = inv.status === 'paid' ? 'sent' : 'paid';
@@ -1817,13 +1900,17 @@ function generatePDF(inv) {
   ];
 
   function drawSubSectionHeader(label, qtyHdr, rateHdr) {
-    checkPageBreak(36);
-    // Sub-section title bar (lighter)
+    checkPageBreak(40);
+    // Row 1: section label band (cyan with navy text, full width)
     setFill(CYAN_LIGHT); doc.rect(M, y, innerW, 14, 'F');
-    setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(8.5);
-    doc.text(label, M + 6, y + 10);
-    // Column headers on same band, right-aligned
-    doc.setFontSize(7.5);
+    setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(9);
+    doc.text(label, M + 8, y + 10);
+    y += 14;
+    // Row 2: column headers band (slightly darker, smaller text)
+    setFill([235, 245, 252]); doc.rect(M, y, innerW, 14, 'F');
+    setDraw([200, 215, 230]); doc.setLineWidth(0.3);
+    doc.line(M, y + 14, M + innerW, y + 14);
+    setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(7.5);
     doc.text('DATE', colDate + 4, y + 10);
     doc.text('DESCRIPTION', colDesc + 4, y + 10);
     doc.text(qtyHdr, colQty - 4, y + 10, { align: 'right' });
@@ -1864,16 +1951,17 @@ function generatePDF(inv) {
 
   function drawNarrativeBlock(label, text) {
     if (!text || !String(text).trim()) return;
-    const lines = doc.splitTextToSize(String(text).trim(), innerW - 100);
-    const blockH = 6 + lines.length * 11 + 4;
+    const valueX = 130; // pushed out so the longest label ("WORK PERFORMED:") never overlaps
+    const lines = doc.splitTextToSize(String(text).trim(), innerW - (valueX - M) - 10);
+    const blockH = Math.max(20, 6 + lines.length * 11 + 4);
     checkPageBreak(blockH + 4);
     setFill([252, 252, 248]); doc.rect(M, y, innerW, blockH, 'F');
     setDraw([200, 200, 195]); doc.setLineWidth(0.3); doc.rect(M, y, innerW, blockH, 'S');
     setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(8.5);
-    doc.text(label.toUpperCase() + ':', M + 6, y + 11);
+    doc.text(label.toUpperCase() + ':', M + 6, y + 12);
     setText(BLACK); doc.setFont('helvetica', 'normal').setFontSize(9);
     lines.forEach((ln, i) => {
-      doc.text(ln, M + 90, y + 11 + i * 11);
+      doc.text(ln, M + valueX - M, y + 12 + i * 11);
     });
     y += blockH + 2;
   }
@@ -2062,6 +2150,60 @@ function generatePDF(inv) {
   showToast('PDF saved: ' + filename);
 }
 
+// ---------------- EMAIL INVOICE ----------------
+function emailInvoice(inv) {
+  const cust = data.customers.find(c => c.id === inv.customerId);
+  const s = data.settings;
+
+  // Build the body
+  const ticketsForInvoice = (inv.ticketIds || []).map(id => data.tickets.find(t => t.id === id)).filter(Boolean);
+  const jobLines = ticketsForInvoice.map(t => {
+    const eq = t.equipmentInfo || {};
+    const eqStr = `${eq.year || ''} ${eq.makeModel || ''}`.trim();
+    return `  • ${t.number} — ${t.title || ''}${eqStr ? ' (' + eqStr + ')' : ''}`;
+  }).join('\n');
+
+  const greeting = cust && cust.name
+    ? 'Hi ' + cust.name.split(' ')[0].split(',')[0] + ','
+    : 'Hi,';
+
+  const body = `${greeting}
+
+Attached is invoice ${inv.number} for ${fmtMoney(inv.total)}.
+
+${jobLines ? 'Work performed:\n' + jobLines + '\n' : ''}
+Easiest way to pay (no fees):
+  Zelle email: muzzleflash9600@gmail.com
+  Zelle phone: (210) 529-0883
+  Name: Kenneth Stevens
+
+Or mail check payable to:
+  ${s.ownerName}
+  ${(s.address || '').split('\n').join(', ')}
+
+Thanks for your business —
+${s.ownerName.split(' ')[0]}
+${s.phone || ''}
+${s.email || ''}
+
+P.S. — please attach the PDF that was just downloaded before sending this email.`;
+
+  const subject = `Invoice ${inv.number} — ${s.businessName}`;
+  const to = cust && cust.email ? cust.email : '';
+
+  const mailto = 'mailto:' + encodeURIComponent(to) +
+    '?subject=' + encodeURIComponent(subject) +
+    '&body=' + encodeURIComponent(body);
+
+  if (!to) {
+    showToast('No email on file for this customer — add one in Customers', true);
+    return;
+  }
+  // Try opening — most mobile devices open the default mail app
+  window.location.href = mailto;
+  showToast('Opening email — attach the PDF before sending');
+}
+
 // ---------------- SETTINGS ----------------
 function prepareSettings() {
   const s = data.settings;
@@ -2071,6 +2213,8 @@ function prepareSettings() {
   document.getElementById('set-email').value = s.email || '';
   document.getElementById('set-phone').value = s.phone || '';
   document.getElementById('set-payment-instructions').value = s.paymentInstructions || '';
+  const ver = document.getElementById('app-version');
+  if (ver) ver.textContent = APP_VERSION;
 }
 
 document.getElementById('settings-save-btn').addEventListener('click', () => {
@@ -2117,6 +2261,87 @@ document.getElementById('import-file').addEventListener('change', e => {
 
 document.getElementById('settings-btn').addEventListener('click', () => showScreen('settings'));
 
+// ---------------- DIAGNOSTIC EXPORT ----------------
+document.getElementById('diag-export-btn').addEventListener('click', () => {
+  if (!confirm('This will download a file with all your app data and open an email to Chad. Continue?')) return;
+
+  const diag = {
+    appVersion: APP_VERSION,
+    schemaVersion: SCHEMA_VERSION,
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    language: navigator.language,
+    online: navigator.onLine,
+    screen: { w: screen.width, h: screen.height },
+    storageEstimate: 'unknown',
+    driveSyncState: {
+      enabled: driveState.enabled,
+      signedIn: driveState.signedIn,
+      lastSyncedAt: driveState.lastSyncedAt ? new Date(driveState.lastSyncedAt).toISOString() : null,
+      pendingChanges: driveState.pendingChanges,
+      driveFileExists: !!driveState.driveFileId
+    },
+    counts: {
+      customers: data.customers.length,
+      tickets: data.tickets.length,
+      invoices: data.invoices.length,
+      openTickets: data.tickets.filter(t => t.status === 'open').length,
+      openInvoices: data.invoices.filter(i => i.status === 'sent').length
+    },
+    recentErrors: errorLog.slice(-20),
+    fullData: data
+  };
+
+  // Try to get storage estimate (chrome supports it)
+  if (navigator.storage && navigator.storage.estimate) {
+    navigator.storage.estimate().then(est => {
+      diag.storageEstimate = `used ${Math.round(est.usage / 1024)} KB of ${Math.round(est.quota / 1024 / 1024)} MB`;
+    }).finally(() => downloadAndEmailDiag(diag));
+  } else {
+    downloadAndEmailDiag(diag);
+  }
+});
+
+function downloadAndEmailDiag(diag) {
+  // 1. Download the JSON file
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
+  const filename = `kens-diesel-diagnostic-${stamp}.json`;
+  const blob = new Blob([JSON.stringify(diag, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  // 2. Open email pre-filled
+  const subject = `Ken's Diesel App — Diagnostic ${stamp}`;
+  const body = `Hi Chad,
+
+Something's not working right with the app. Diagnostic file just downloaded — I'll attach it before sending this email.
+
+What I was trying to do:
+[describe what you were doing when it broke]
+
+What went wrong:
+[what did you see / what didn't work]
+
+App version: ${APP_VERSION}
+Customers: ${diag.counts.customers}
+Tickets: ${diag.counts.tickets}
+Invoices: ${diag.counts.invoices}
+${diag.recentErrors.length > 0 ? '\nRecent errors logged: ' + diag.recentErrors.length : ''}
+
+Thanks,
+Ken`;
+
+  const mailto = 'mailto:chadcrocker@cacattlebrd.com?subject=' +
+    encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  window.location.href = mailto;
+  showToast('Attach the diagnostic file before sending');
+}
+
 // ---------------- GLOBAL EVENT DELEGATION ----------------
 document.addEventListener('click', e => {
   const navTarget = e.target.closest('[data-nav]');
@@ -2140,6 +2365,9 @@ document.addEventListener('click', e => {
 loadData();
 migrateIfNeeded();
 initDriveSync();
+checkForUpdate();
+// Also check every 5 min while app is open in case Ken leaves it open all day
+setInterval(checkForUpdate, 5 * 60 * 1000);
 
 // First-run: pre-load CA Cattle as a customer if none exist
 if (data.customers.length === 0) {
