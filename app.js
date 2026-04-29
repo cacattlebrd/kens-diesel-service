@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.0.8';
+const APP_VERSION = '1.1.0';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -1829,7 +1829,7 @@ function generatePDF(inv, returnBlob) {
   // ===== INVOICE META ROW (3 cells: Inv #, Date, Tickets) =====
   const ticketsForInvoice = (inv.ticketIds || []).map(id => data.tickets.find(t => t.id === id)).filter(Boolean);
   const ticketsStr = ticketsForInvoice.map(t => t.number).join(', ') || '—';
-  const cellH = 42;
+  const cellH = 36;
   const c1 = innerW * 0.30, c2 = innerW * 0.30, c3 = innerW * 0.40;
   labelCell(M,           y, c1, cellH, 'Invoice #', inv.number, { fontSize: 13 });
   labelCell(M + c1,      y, c2, cellH, 'Date',      fmtDate(inv.sentDate), { fontSize: 11 });
@@ -1841,12 +1841,12 @@ function generatePDF(inv, returnBlob) {
     setText([150, 80, 0]); doc.setFont('helvetica', 'bold').setFontSize(9);
     doc.text('REVISED ' + fmtDate(inv.lastEditedDate), right - 55, y + 5, { align: 'center' });
   }
-  y += cellH + 6;
+  y += cellH + 4;
 
   // ===== CUSTOMER + EQUIPMENT GRID (work-order style) =====
   // Row 1: Bill To (left half) | Vehicle/Equipment (right half)
   const halfW = innerW / 2;
-  const billRowH = 70;
+  const billRowH = 56;
   // Build bill-to value
   const billToLines = [];
   if (cust) {
@@ -1863,7 +1863,7 @@ function generatePDF(inv, returnBlob) {
     ? `${ticketsCount} job${ticketsCount !== 1 ? 's' : ''} on this invoice`
     : '—';
   labelCell(M + halfW, y, halfW, billRowH, 'Summary', summaryStr, { fontSize: 11 });
-  y += billRowH + 12;
+  y += billRowH + 6;
 
   // ===== COLUMN GEOMETRY (used by per-ticket tables) =====
   const colDate = M;
@@ -1901,31 +1901,31 @@ function generatePDF(inv, returnBlob) {
   ];
 
   function drawSubSectionHeader(label, qtyHdr, rateHdr) {
-    checkPageBreak(40);
+    checkPageBreak(32);
     // Row 1: section label band (cyan with navy text, full width)
-    setFill(CYAN_LIGHT); doc.rect(M, y, innerW, 14, 'F');
+    setFill(CYAN_LIGHT); doc.rect(M, y, innerW, 12, 'F');
     setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(9);
-    doc.text(label, M + 8, y + 10);
-    y += 14;
+    doc.text(label, M + 8, y + 9);
+    y += 12;
     // Row 2: column headers band (slightly darker, smaller text)
-    setFill([235, 245, 252]); doc.rect(M, y, innerW, 14, 'F');
+    setFill([235, 245, 252]); doc.rect(M, y, innerW, 12, 'F');
     setDraw([200, 215, 230]); doc.setLineWidth(0.3);
-    doc.line(M, y + 14, M + innerW, y + 14);
+    doc.line(M, y + 12, M + innerW, y + 12);
     setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(7.5);
-    doc.text('DATE', colDate + 4, y + 10);
-    doc.text('DESCRIPTION', colDesc + 4, y + 10);
-    doc.text(qtyHdr, colQty - 4, y + 10, { align: 'right' });
-    doc.text(rateHdr, colRate - 4, y + 10, { align: 'right' });
-    doc.text('AMOUNT', colTot - 4, y + 10, { align: 'right' });
-    y += 14;
+    doc.text('DATE', colDate + 4, y + 9);
+    doc.text('DESCRIPTION', colDesc + 4, y + 9);
+    doc.text(qtyHdr, colQty - 4, y + 9, { align: 'right' });
+    doc.text(rateHdr, colRate - 4, y + 9, { align: 'right' });
+    doc.text('AMOUNT', colTot - 4, y + 9, { align: 'right' });
+    y += 12;
   }
 
   function drawLineRow(line, rowIdx) {
     const desc = String(line.desc || '');
-    const descLines = doc.splitTextToSize(desc, colQty - colDesc - 8);
-    const extraH = (line.markup && line.markup > 0) ? 10 : 0;
-    const rowH = Math.max(18, descLines.length * 11 + 4 + extraH);
-    checkPageBreak(rowH + 30);
+    const descLines = desc ? doc.splitTextToSize(desc, colQty - colDesc - 8) : [''];
+    const extraH = (line.markup && line.markup > 0) ? 9 : 0;
+    const rowH = Math.max(14, descLines.length * 10 + 3 + extraH);
+    checkPageBreak(rowH + 24);
     if (rowIdx % 2 === 1) {
       setFill(BAND); doc.rect(M, y, innerW, rowH, 'F');
     }
@@ -1933,56 +1933,57 @@ function generatePDF(inv, returnBlob) {
     [colDesc, colQty, colRate].forEach(x => doc.line(x, y, x, y + rowH));
 
     setText(BLACK); doc.setFont('helvetica', 'normal').setFontSize(9);
-    doc.text(fmtDate(line.date) || '', colDate + 4, y + 11);
+    doc.text(fmtDate(line.date) || '', colDate + 4, y + 10);
     descLines.forEach((dl, i) => {
-      doc.text(dl, colDesc + 4, y + 11 + i * 11);
+      doc.text(dl, colDesc + 4, y + 10 + i * 10);
     });
     if (line.markup && line.markup > 0) {
       setText(GREY); doc.setFontSize(7);
-      doc.text('(' + line.markup + '% markup applied)', colDesc + 4, y + 11 + descLines.length * 11);
+      doc.text('(' + line.markup + '% markup applied)', colDesc + 4, y + 10 + descLines.length * 10);
       setText(BLACK); doc.setFontSize(9);
     }
-    doc.text(String(line.qty || 0), colQty - 4, y + 11, { align: 'right' });
-    doc.text(fmtMoney(line.rate), colRate - 4, y + 11, { align: 'right' });
+    doc.text(String(line.qty || 0), colQty - 4, y + 10, { align: 'right' });
+    doc.text(fmtMoney(line.rate), colRate - 4, y + 10, { align: 'right' });
     doc.setFont('helvetica', 'bold');
-    doc.text(fmtMoney(lineTotal(line)), colTot - 4, y + 11, { align: 'right' });
+    doc.text(fmtMoney(lineTotal(line)), colTot - 4, y + 10, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     y += rowH;
   }
 
+
   function drawNarrativeBlock(label, text) {
     if (!text || !String(text).trim()) return;
-    const valueX = 130; // pushed out so the longest label ("WORK PERFORMED:") never overlaps
+    const valueX = 120; // pushed out so the longest label ("WORK PERFORMED:") never overlaps
     const lines = doc.splitTextToSize(String(text).trim(), innerW - (valueX - M) - 10);
-    const blockH = Math.max(20, 6 + lines.length * 11 + 4);
-    checkPageBreak(blockH + 4);
+    const blockH = Math.max(16, 4 + lines.length * 10 + 3);
+    checkPageBreak(blockH + 2);
     setFill([252, 252, 248]); doc.rect(M, y, innerW, blockH, 'F');
     setDraw([200, 200, 195]); doc.setLineWidth(0.3); doc.rect(M, y, innerW, blockH, 'S');
     setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(8.5);
-    doc.text(label.toUpperCase() + ':', M + 6, y + 12);
+    doc.text(label.toUpperCase() + ':', M + 6, y + 10);
     setText(BLACK); doc.setFont('helvetica', 'normal').setFontSize(9);
     lines.forEach((ln, i) => {
-      doc.text(ln, M + valueX - M, y + 12 + i * 11);
+      doc.text(ln, M + valueX - M, y + 10 + i * 10);
     });
-    y += blockH + 2;
+    y += blockH + 1;
   }
 
   function drawTicketBlock(ticket, lines) {
     checkPageBreak(80);
 
     // ---- Ticket header bar (navy with cyan title) ----
-    setFill(NAVY); doc.rect(M, y, innerW, 22, 'F');
-    setFill(CYAN); doc.rect(M, y, 4, 22, 'F'); // cyan left edge accent
+    setFill(NAVY); doc.rect(M, y, innerW, 18, 'F');
+    setFill(CYAN); doc.rect(M, y, 4, 18, 'F'); // cyan left edge accent
     setText(CYAN); doc.setFont('helvetica', 'bold').setFontSize(11);
-    doc.text(ticket.number, M + 12, y + 15);
+    doc.text(ticket.number, M + 12, y + 13);
     setText([255, 255, 255]); doc.setFont('helvetica', 'normal').setFontSize(10);
     const titleStr = ticket.title || '(untitled)';
-    doc.text(titleStr, M + 110, y + 15);
+    doc.text(titleStr, M + 110, y + 13);
     if (ticket.jobCode) {
       setText(CYAN_LIGHT); doc.setFontSize(8);
-      doc.text('Job code: ' + ticket.jobCode, right - 8, y + 15, { align: 'right' });
+      doc.text('Job code: ' + ticket.jobCode, right - 8, y + 13, { align: 'right' });
     }
-    y += 26;
+    y += 20;
 
     // ---- Equipment row (if any equipment info) ----
     const eq = ticket.equipmentInfo || {};
@@ -1994,13 +1995,13 @@ function generatePDF(inv, returnBlob) {
         eq.odometer ? 'Hrs/Mi: ' + eq.odometer : '',
         eq.licensePlate ? 'Plate: ' + eq.licensePlate : ''
       ].filter(Boolean).join('  •  ');
-      checkPageBreak(20);
-      setFill([245, 250, 255]); doc.rect(M, y, innerW, 16, 'F');
+      checkPageBreak(16);
+      setFill([245, 250, 255]); doc.rect(M, y, innerW, 14, 'F');
       setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(8);
-      doc.text('EQUIPMENT:', M + 6, y + 11);
+      doc.text('EQUIPMENT:', M + 6, y + 10);
       setText(BLACK); doc.setFont('helvetica', 'normal').setFontSize(9);
-      doc.text(eqStr, M + 76, y + 11);
-      y += 18;
+      doc.text(eqStr, M + 70, y + 10);
+      y += 14;
     }
 
     // ---- Narrative blocks ----
@@ -2008,7 +2009,7 @@ function generatePDF(inv, returnBlob) {
     drawNarrativeBlock('Diagnosis', ticket.diagnosis);
     drawNarrativeBlock('Work Performed', ticket.workSummary);
 
-    y += 4;
+    y += 2;
 
     // ---- Line item subsections (only for types this ticket has lines in) ----
     const byType = {};
@@ -2030,13 +2031,13 @@ function generatePDF(inv, returnBlob) {
     });
 
     // ---- Ticket subtotal bar ----
-    checkPageBreak(22);
-    setFill([235, 245, 252]); doc.rect(M, y, innerW, 18, 'F');
-    setDraw(NAVY); doc.setLineWidth(0.8); doc.rect(M, y, innerW, 18, 'S');
+    checkPageBreak(20);
+    setFill([235, 245, 252]); doc.rect(M, y, innerW, 16, 'F');
+    setDraw(NAVY); doc.setLineWidth(0.8); doc.rect(M, y, innerW, 16, 'S');
     setText(NAVY); doc.setFont('helvetica', 'bold').setFontSize(10);
-    doc.text(ticket.number + ' SUBTOTAL', M + 8, y + 12);
-    doc.text(fmtMoney(ticketTotal), right - 8, y + 12, { align: 'right' });
-    y += 26;
+    doc.text(ticket.number + ' SUBTOTAL', M + 8, y + 11);
+    doc.text(fmtMoney(ticketTotal), right - 8, y + 11, { align: 'right' });
+    y += 18;
   }
 
   // Render each ticket block
@@ -2078,61 +2079,64 @@ function generatePDF(inv, returnBlob) {
   }
 
   // ===== GRAND TOTAL BLOCK (right-side) + payment instructions (left) =====
-  checkPageBreak(120);
-  y += 6;
-  const totalsW = 240;
+  // Smaller minimum so it fits on the same page as the last ticket more often
+  const totalsBlockH = 82;
+  checkPageBreak(totalsBlockH + 8);
+  y += 4;
+  const totalsW = 220;
   const totalsX = right - totalsW;
   const totalsY = y;
 
   // Frame
   setDraw(NAVY); doc.setLineWidth(1.2);
-  doc.rect(totalsX, totalsY, totalsW, 100, 'S');
+  doc.rect(totalsX, totalsY, totalsW, totalsBlockH, 'S');
   // Header
-  setFill(NAVY); doc.rect(totalsX, totalsY, totalsW, 18, 'F');
+  setFill(NAVY); doc.rect(totalsX, totalsY, totalsW, 16, 'F');
   setText(CYAN); doc.setFont('helvetica', 'bold').setFontSize(10);
-  doc.text('INVOICE TOTAL', totalsX + 8, totalsY + 13);
+  doc.text('INVOICE TOTAL', totalsX + 8, totalsY + 11);
 
   setText(BLACK); doc.setFont('helvetica', 'normal').setFontSize(9);
-  let ty = totalsY + 32;
+  let ty = totalsY + 28;
   doc.text('Subtotal:', totalsX + 10, ty);
   doc.text(fmtMoney(inv.subtotal), totalsX + totalsW - 10, ty, { align: 'right' });
-  ty += 14;
+  ty += 12;
   if (inv.chargeback && inv.chargeback !== 0) {
     doc.text('Chargeback:', totalsX + 10, ty);
     doc.text(fmtMoney(inv.chargeback), totalsX + totalsW - 10, ty, { align: 'right' });
-    ty += 14;
+    ty += 12;
   }
-  // Grand Total band
-  setFill(NAVY); doc.rect(totalsX, totalsY + 66, totalsW, 34, 'F');
-  setText(CYAN); doc.setFont('helvetica', 'bold').setFontSize(13);
-  doc.text('GRAND TOTAL', totalsX + 10, totalsY + 88);
-  setText([255, 255, 255]); doc.setFontSize(16);
-  doc.text(fmtMoney(inv.total), totalsX + totalsW - 10, totalsY + 88, { align: 'right' });
+  // Grand Total band (bottom of frame)
+  const gtH = 28;
+  setFill(NAVY); doc.rect(totalsX, totalsY + totalsBlockH - gtH, totalsW, gtH, 'F');
+  setText(CYAN); doc.setFont('helvetica', 'bold').setFontSize(12);
+  doc.text('GRAND TOTAL', totalsX + 10, totalsY + totalsBlockH - 9);
+  setText([255, 255, 255]); doc.setFontSize(15);
+  doc.text(fmtMoney(inv.total), totalsX + totalsW - 10, totalsY + totalsBlockH - 9, { align: 'right' });
   setText(BLACK);
 
   // Payment instructions (left of total box)
-  setFill([252, 252, 248]); doc.rect(M, totalsY, totalsX - M - 10, 100, 'F');
-  setDraw([200, 200, 195]); doc.setLineWidth(0.4); doc.rect(M, totalsY, totalsX - M - 10, 100, 'S');
+  setFill([252, 252, 248]); doc.rect(M, totalsY, totalsX - M - 8, totalsBlockH, 'F');
+  setDraw([200, 200, 195]); doc.setLineWidth(0.4); doc.rect(M, totalsY, totalsX - M - 8, totalsBlockH, 'S');
   doc.setFont('helvetica', 'bold').setFontSize(9);
   setText(NAVY);
-  doc.text('PAYMENT INSTRUCTIONS', M + 8, totalsY + 14);
+  doc.text('PAYMENT INSTRUCTIONS', M + 8, totalsY + 12);
   setText(BLACK); doc.setFont('helvetica', 'normal').setFontSize(8.5);
-  let py = totalsY + 28;
+  let py = totalsY + 24;
   s.paymentInstructions.split('\n').forEach(line => {
-    if (py < totalsY + 96) { doc.text(line, M + 8, py); py += 11; }
+    if (py < totalsY + totalsBlockH - 4) { doc.text(line, M + 8, py); py += 10; }
   });
 
-  y = totalsY + 110;
+  y = totalsY + totalsBlockH + 6;
 
   // ===== SIGNATURE LINES =====
-  checkPageBreak(60);
-  y += 8;
+  checkPageBreak(36);
+  y += 6;
   setDraw(BLACK); doc.setLineWidth(0.5);
   doc.line(M, y, M + 240, y);
   doc.line(right - 200, y, right, y);
   setText(GREY); doc.setFont('helvetica', 'normal').setFontSize(8);
-  doc.text('Customer Authorized Signature', M, y + 11);
-  doc.text('Date', right - 200, y + 11);
+  doc.text('Customer Authorized Signature', M, y + 9);
+  doc.text('Date', right - 200, y + 9);
   setText(BLACK);
 
   // ===== FOOTER =====
@@ -2162,26 +2166,6 @@ async function emailInvoice(inv) {
   const cust = data.customers.find(c => c.id === inv.customerId);
   const s = data.settings;
 
-  // Build a short equipment overview from the tickets on this invoice
-  const ticketsForInvoice = (inv.ticketIds || []).map(id => data.tickets.find(t => t.id === id)).filter(Boolean);
-  const equipList = ticketsForInvoice.map(t => {
-    const eq = t.equipmentInfo || {};
-    const yearMake = `${eq.year || ''} ${eq.makeModel || ''}`.trim();
-    return yearMake || t.title || '';
-  }).filter(Boolean);
-
-  // Build a one-line summary of equipment for the body
-  let equipSummary;
-  if (equipList.length === 0) {
-    equipSummary = 'requested work';
-  } else if (equipList.length === 1) {
-    equipSummary = equipList[0];
-  } else if (equipList.length === 2) {
-    equipSummary = equipList[0] + ' and ' + equipList[1];
-  } else {
-    equipSummary = equipList[0] + ' and other equipment';
-  }
-
   // Greeting — first word of customer name
   const greeting = cust && cust.name
     ? 'Hi ' + cust.name.split(/[\s,]/)[0] + ','
@@ -2194,26 +2178,10 @@ async function emailInvoice(inv) {
 
   const body = `${greeting}
 
-Attached is invoice ${inv.number} (${fmtMoney(inv.total)}) for work performed on ${dateForSubject} on ${equipSummary}. Full details on the invoice.
+Attached is invoice ${inv.number}.
 
-------------------------------------------
-PAYMENT OPTIONS (no fees on Zelle)
-------------------------------------------
-Zelle email:   muzzleflash9600@gmail.com
-Zelle phone:   (210) 529-0883
-Zelle name:    Kenneth Stevens
-
-Or mail check payable to:
-   ${s.ownerName}
-   ${(s.address || '').split('\n').join('\n   ')}
-------------------------------------------
-
-Thanks for your business,
-
-${s.ownerName.split(' ')[0]}
-${s.businessName}
-${s.phone || ''}
-${s.email || ''}`;
+Thank you for your business,
+Ken`;
 
   const to = cust && cust.email ? cust.email : '';
   if (!to) {
