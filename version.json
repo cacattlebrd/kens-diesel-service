@@ -1,4 +1,4 @@
 {
-  "version": "1.1.1",
-  "notes": "Cleaner PDF filename (no underscores) and tighter email body"
+  "version": "1.1.2",
+  "notes": "Email button now opens Gmail web compose on desktop browsers"
 }

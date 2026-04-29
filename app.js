@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.1.2';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -2206,13 +2206,31 @@ Ken`;
     console.warn('Web Share failed, falling back:', err);
   }
 
-  // ---- Fallback: download PDF + open mailto (manual attach) ----
-  generatePDF(inv); // saves to device
-  const mailto = 'mailto:' + encodeURIComponent(to) +
-    '?subject=' + encodeURIComponent(subject) +
+  // ---- Fallback for desktop: download PDF + open Gmail web compose ----
+  // Gmail's web compose URL accepts to/su/body params and opens a draft.
+  // User has to manually attach the PDF (browser security: no auto-attach via URL).
+  generatePDF(inv); // saves PDF to device
+
+  // Detect if user is on desktop (rough heuristic — assume Web Share missing means desktop)
+  // Open Gmail in a new tab, pre-filled. If they're not signed in, they'll see Gmail login,
+  // then land in compose with the params still applied.
+  const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1' +
+    '&to=' + encodeURIComponent(to) +
+    '&su=' + encodeURIComponent(subject) +
     '&body=' + encodeURIComponent(body);
-  window.location.href = mailto;
-  showToast('PDF downloaded — attach it to the email');
+
+  // Try to open Gmail web in a new tab. If popup blocker stops us, fall back to mailto.
+  const newTab = window.open(gmailUrl, '_blank');
+  if (newTab) {
+    showToast('PDF downloaded — Gmail opening, attach it before sending');
+  } else {
+    // Popup blocked — fall back to mailto (opens default mail app)
+    const mailto = 'mailto:' + encodeURIComponent(to) +
+      '?subject=' + encodeURIComponent(subject) +
+      '&body=' + encodeURIComponent(body);
+    window.location.href = mailto;
+    showToast('PDF downloaded — attach it to the email');
+  }
 }
 
 // ---------------- SETTINGS ----------------
