@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.1.3';
+const APP_VERSION = '1.1.4';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -2193,10 +2193,15 @@ async function emailInvoice(inv) {
 
   const subject = `${inv.number} — Mechanical work performed on ${dateForSubject}`;
 
-  const body = `Attached is invoice ${inv.number}.
-
-Thank you for your business,
-Ken`;
+  const body = [
+    'Attached is invoice ' + inv.number + '.',
+    '',
+    'Thank you for your business,',
+    '',
+    'Ken Stevens',
+    '210-529-0883',
+    'kensmechanicservice@gmail.com'
+  ].join('\r\n');
 
   const to = cust && cust.email ? cust.email : '';
   if (!to) {
