@@ -1,4 +1,4 @@
 {
-  "version": "1.0.7",
-  "notes": "Added app version stamp at the bottom of page 1 of every invoice PDF"
+  "version": "1.0.8",
+  "notes": "Fixed app version display — now centered properly at bottom of every screen"
 }
