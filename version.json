@@ -1,4 +1,4 @@
 {
-  "version": "1.0.6",
-  "notes": "Email button now auto-attaches the PDF via the share sheet on iPhone"
+  "version": "1.0.7",
+  "notes": "Added app version stamp at the bottom of page 1 of every invoice PDF"
 }

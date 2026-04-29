@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.0.6';
+const APP_VERSION = '1.0.7';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -2412,6 +2412,9 @@ document.addEventListener('click', e => {
 loadData();
 migrateIfNeeded();
 initDriveSync();
+// Render version stamp at the bottom of the app
+const verEl = document.getElementById('app-version-num');
+if (verEl) verEl.textContent = APP_VERSION;
 checkForUpdate();
 // Also check every 5 min while app is open in case Ken leaves it open all day
 setInterval(checkForUpdate, 5 * 60 * 1000);
