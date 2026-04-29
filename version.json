@@ -1,4 +1,4 @@
 {
-  "version": "1.1.0",
-  "notes": "Tightened invoice PDF spacing — fits more per page, less wasted space"
+  "version": "1.1.1",
+  "notes": "Cleaner PDF filename (no underscores) and tighter email body"
 }

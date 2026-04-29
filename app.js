@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -2149,8 +2149,11 @@ function generatePDF(inv, returnBlob) {
   doc.text(s.businessName + ' • ' + (s.phone || '') + ' • ' + s.email,
     M + innerW / 2, pageH - 12, { align: 'center' });
 
-  const filename = (inv.number || 'invoice').replace(/[^a-z0-9-]/gi, '_') +
-    '_' + (cust ? cust.name.replace(/[^a-z0-9]/gi, '_') : 'customer') + '.pdf';
+  // Clean filename: spaces stay as spaces, special chars dropped, no double-underscore mess
+  const cleanCustName = cust
+    ? cust.name.replace(/[^a-z0-9 ]/gi, '').replace(/\s+/g, ' ').trim()
+    : 'customer';
+  const filename = (inv.number || 'invoice') + ' ' + cleanCustName + '.pdf';
 
   if (returnBlob) {
     const blob = doc.output('blob');
@@ -2166,19 +2169,12 @@ async function emailInvoice(inv) {
   const cust = data.customers.find(c => c.id === inv.customerId);
   const s = data.settings;
 
-  // Greeting — first word of customer name
-  const greeting = cust && cust.name
-    ? 'Hi ' + cust.name.split(/[\s,]/)[0] + ','
-    : 'Hi,';
-
   // Date for subject (use invoice date, formatted clean)
   const dateForSubject = fmtDate(inv.sentDate);
 
   const subject = `${inv.number} — Mechanical work performed on ${dateForSubject}`;
 
-  const body = `${greeting}
-
-Attached is invoice ${inv.number}.
+  const body = `Attached is invoice ${inv.number}.
 
 Thank you for your business,
 Ken`;
