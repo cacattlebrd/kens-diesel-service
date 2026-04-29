@@ -1,4 +1,4 @@
 {
-  "version": "1.1.4",
-  "notes": "Email body now includes Ken's full sign-off (name, phone, email)"
+  "version": "1.1.5",
+  "notes": "Email button now shares only the PDF — fixes blob URL bug. Type your message in Mail."
 }

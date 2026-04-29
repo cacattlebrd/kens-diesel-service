@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.1.4';
+const APP_VERSION = '1.1.5';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -2210,11 +2210,14 @@ async function emailInvoice(inv) {
   }
 
   // ---- Try the Web Share API path (iPhone/Android — attaches PDF) ----
+  // IMPORTANT: only pass `files` — passing title/text causes iOS Gmail to inject
+  // the blob:// URL into the email body instead of using our text. Bug confirmed
+  // in v1.1.4 testing. Ken types his own body or uses a saved Mail signature.
   try {
     const result = generatePDF(inv, true); // returns { blob, filename }
     if (result && result.blob && navigator.canShare) {
       const file = new File([result.blob], result.filename, { type: 'application/pdf' });
-      const shareData = { files: [file], title: subject, text: body };
+      const shareData = { files: [file] }; // file ONLY — no text, no title
       if (navigator.canShare(shareData)) {
         showToast('Opening share sheet — pick Mail');
         await navigator.share(shareData);
