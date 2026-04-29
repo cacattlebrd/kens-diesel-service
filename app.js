@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.1.3';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -19,7 +19,7 @@ let data = {
     address: "222 E Mitchell St apt 5213\nSan Antonio, TX 78210",
     email: "kensmechanicservice@gmail.com",
     phone: "(210) 529-0883",
-    paymentInstructions: "Pay by Zelle (no fees):\n  Email: muzzleflash9600@gmail.com\n  Phone: (210) 529-0883\nName on Zelle: Kenneth Stevens\n\nOR mail check payable to: Kenneth Wayne Stevens Jr\n222 E Mitchell St apt 5213, San Antonio, TX 78210",
+    paymentInstructions: "Pay by Zelle (no fees):\n  Email: kensmechanicservice@gmail.com\n  Phone: (210) 529-0883\nName on Zelle: Kenneth Stevens\n\nOR mail check payable to: Kenneth Wayne Stevens Jr\n222 E Mitchell St apt 5213, San Antonio, TX 78210",
     nextInvoiceNumber: 1
   }
 };
@@ -378,6 +378,19 @@ function saveData() {
   } catch (e) {
     console.error('Save error:', e);
     showToast('Could not save data', true);
+  }
+}
+
+// ---------------- ONE-TIME PAYMENT INSTRUCTIONS FIX ----------------
+// Ken's first install had muzzleflash9600@gmail.com in his Zelle email
+// (typo / wrong account). Replace any saved instance with the correct address.
+function fixPaymentInstructions() {
+  if (!data.settings) return;
+  const pi = data.settings.paymentInstructions || '';
+  if (pi.indexOf('muzzleflash9600') !== -1) {
+    data.settings.paymentInstructions = pi.replace(/muzzleflash9600/g, 'kensmechanicservice');
+    saveDataLocal();
+    showToast('Payment instructions updated to use kensmechanicservice email');
   }
 }
 
@@ -2079,12 +2092,17 @@ function generatePDF(inv, returnBlob) {
   }
 
   // ===== GRAND TOTAL BLOCK (right-side) + payment instructions (left) =====
-  // Smaller minimum so it fits on the same page as the last ticket more often
-  const totalsBlockH = 82;
-  checkPageBreak(totalsBlockH + 8);
-  y += 4;
+  // Calculate block height based on payment instructions content (auto-grow so nothing clips)
+  const payLines = (s.paymentInstructions || '').split('\n');
   const totalsW = 220;
   const totalsX = right - totalsW;
+  // Right side needs ~70pt for header + subtotal + grand total band
+  const rightSideH = 70 + (inv.chargeback && inv.chargeback !== 0 ? 12 : 0);
+  // Left side needs space for header + each line of payment instructions
+  const leftSideH = 24 + (payLines.length * 10) + 8;
+  const totalsBlockH = Math.max(rightSideH, leftSideH);
+  checkPageBreak(totalsBlockH + 8);
+  y += 4;
   const totalsY = y;
 
   // Frame
@@ -2123,7 +2141,8 @@ function generatePDF(inv, returnBlob) {
   setText(BLACK); doc.setFont('helvetica', 'normal').setFontSize(8.5);
   let py = totalsY + 24;
   s.paymentInstructions.split('\n').forEach(line => {
-    if (py < totalsY + totalsBlockH - 4) { doc.text(line, M + 8, py); py += 10; }
+    doc.text(line, M + 8, py);
+    py += 10;
   });
 
   y = totalsY + totalsBlockH + 6;
@@ -2393,6 +2412,7 @@ document.addEventListener('click', e => {
 // ---------------- BOOT ----------------
 loadData();
 migrateIfNeeded();
+fixPaymentInstructions(); // one-time muzzleflash → kensmechanicservice swap
 initDriveSync();
 // Render version stamp at the bottom of the app
 const verEl = document.getElementById('app-version-num');
