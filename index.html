@@ -124,7 +124,11 @@
             <input type="text" id="tk-title" placeholder="e.g., Bobcat S450 Engine Rebuild" required>
           </label>
 
-          <label>Job Code
+          <label id="tk-acct-wrap" style="display:none;">CA Cattle Account Code *
+            <select id="tk-acct"></select>
+          </label>
+
+          <label id="tk-job-code-wrap">Job Code
             <input type="text" id="tk-job-code" placeholder="e.g., 8520/2368">
           </label>
 
@@ -480,6 +484,6 @@
   </div>
   <div id="app-version-footer">Ken's Diesel Service • v<span id="app-version-num">1.1.5</span></div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=1.1.6"></script>
 </body>
 </html>

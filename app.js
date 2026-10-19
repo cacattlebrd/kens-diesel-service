@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.1.5';
+const APP_VERSION = '1.1.6';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -643,6 +643,81 @@ document.getElementById('tickets-filter-status').addEventListener('change', appl
 // ---------------- TICKET EDITOR ----------------
 let currentTicketId = null;
 
+// ---------------- CA CATTLE ACCOUNT CODES ----------------
+// 8000-series accounts from BRD Chart of Accounts (Xero, pulled 8-14-26).
+// Xero system accounts (8100B, 8199, 8200R) left out on purpose.
+// For CA Cattle tickets Ken MUST pick one of these — no free typing.
+const CA_CATTLE_ACCOUNTS = [
+  ['8000', 'Salaries Bakery'],
+  ['8001', 'Salaries-Bakery-Overtime'],
+  ['8005', 'Bakery Contract Labor'],
+  ['8012', 'Bakery Office Expenses'],
+  ['8013', 'Bakery Purchases'],
+  ['8014', 'Bakery Freight'],
+  ['8020', 'Bakery Fuel'],
+  ['8035', 'Bakery Lease'],
+  ['8045', 'Bakery Management Expense'],
+  ['8049', 'Bakery Miscellaneous'],
+  ['8050', 'Bakery Maintenance and Repair'],
+  ['8052', 'Bakery Repairs - Reconserve'],
+  ['8055', 'Bakery Mill Supplies / Parts'],
+  ['8060', 'Bakery Skid Steer Maintenance and Repair'],
+  ['8062', 'Bakery Trailer Maintenance and Repair'],
+  ['8064', 'Bakery Semi-Truck Maintenance and Repair'],
+  ['8065', 'Bakery Semi-Truck Lease'],
+  ['8068', 'Bakery Company Pickups'],
+  ['8070', 'Bakery Supplies'],
+  ['8080', 'Bakery Analysis and Testing'],
+  ['8102', 'Bakery Scale Tickets'],
+  ['8115', 'Taxes - Other'],
+  ['8117', 'Bakery Payroll Taxes'],
+  ['8150', 'Bakery Utilities'],
+  ['8152', 'Bakery Trash'],
+  ['8154', 'Bakery Internet, Telephone and Computer'],
+  ['8160', 'Bakery Bank and Merchant Fees'],
+  ['8502', 'Bakery Insurance Costs'],
+  ['8503', 'Bakery Professional Services'],
+  ['8504', 'Bakery Safety'],
+  ['8505', 'Bakery DOT Expenses']
+];
+const CA_ACCT_CODES = new Set(CA_CATTLE_ACCOUNTS.map(a => a[0]));
+
+function isCACattle(cust) {
+  if (!cust) return false;
+  return cust.shortCode === 'CA' || /ca\s*cattle/i.test(cust.name || '');
+}
+
+function acctName(code) {
+  const a = CA_CATTLE_ACCOUNTS.find(x => x[0] === code);
+  return a ? a[1] : '';
+}
+
+// Text shown on invoice/PDF for the ticket's code
+function jobCodeLabel(ticket) {
+  if (!ticket || !ticket.jobCode) return '';
+  const cust = data.customers.find(c => c.id === ticket.customerId);
+  if (isCACattle(cust) && CA_ACCT_CODES.has(ticket.jobCode)) {
+    return 'Acct ' + ticket.jobCode + ' - ' + acctName(ticket.jobCode).replace(/^Bakery /, '');
+  }
+  return 'Job code: ' + ticket.jobCode;
+}
+
+// Swap the Job Code box for the account dropdown when customer is CA Cattle
+function syncJobCodeField() {
+  const custId = document.getElementById('tk-customer').value;
+  const cust = data.customers.find(c => c.id === custId);
+  const ca = isCACattle(cust);
+  document.getElementById('tk-acct-wrap').style.display = ca ? '' : 'none';
+  document.getElementById('tk-job-code-wrap').style.display = ca ? 'none' : '';
+}
+
+function fillAcctSelect(selected) {
+  const sel = document.getElementById('tk-acct');
+  sel.innerHTML = '<option value="">— Pick account code —</option>' +
+    CA_CATTLE_ACCOUNTS.map(a => `<option value="${a[0]}">${a[0]} — ${a[1]}</option>`).join('');
+  sel.value = CA_ACCT_CODES.has(selected) ? selected : '';
+}
+
 function prepareTicket(ticketId) {
   // Customer dropdown
   const sel = document.getElementById('tk-customer');
@@ -660,6 +735,7 @@ function prepareTicket(ticketId) {
     document.getElementById('tk-status').value = t.status;
     document.getElementById('tk-title').value = t.title || '';
     document.getElementById('tk-job-code').value = t.jobCode || '';
+    fillAcctSelect(t.jobCode || '');
     document.getElementById('tk-eq-year').value = t.equipmentInfo?.year || '';
     document.getElementById('tk-eq-makemodel').value = t.equipmentInfo?.makeModel || '';
     document.getElementById('tk-eq-serial').value = t.equipmentInfo?.serialOrVin || '';
@@ -679,8 +755,12 @@ function prepareTicket(ticketId) {
     document.getElementById('tk-number').value = '(saves on first save)';
     document.getElementById('tk-status').value = 'open';
     document.getElementById('ticket-lines-panel').style.display = 'none';
+    fillAcctSelect('');
   }
+  syncJobCodeField();
 }
+
+document.getElementById('tk-customer').addEventListener('change', syncJobCodeField);
 
 document.getElementById('ticket-back-btn').addEventListener('click', () => showScreen('tickets'));
 
@@ -692,6 +772,10 @@ document.getElementById('tk-save-btn').addEventListener('click', () => {
 
   const cust = data.customers.find(c => c.id === custId);
   if (!cust) { showToast('Customer not found', true); return; }
+  const caAcct = document.getElementById('tk-acct').value;
+  if (isCACattle(cust) && !CA_ACCT_CODES.has(caAcct)) {
+    showToast('Pick a CA Cattle account code', true); return;
+  }
 
   let ticket;
   if (currentTicketId) {
@@ -718,7 +802,7 @@ document.getElementById('tk-save-btn').addEventListener('click', () => {
   // Update fields (number does not change once assigned)
   ticket.customerId = custId;
   ticket.title = title;
-  ticket.jobCode = document.getElementById('tk-job-code').value.trim();
+  ticket.jobCode = isCACattle(cust) ? caAcct : document.getElementById('tk-job-code').value.trim();
   ticket.status = document.getElementById('tk-status').value;
   ticket.closedDate = ticket.status === 'closed' ? (ticket.closedDate || todayISO()) : null;
   ticket.equipmentInfo = {
@@ -1392,6 +1476,17 @@ document.getElementById('invoice-submit-btn').addEventListener('click', () => {
   if (!custId) { showToast('Pick a customer', true); return; }
   if (currentInvoiceLines.length === 0) { showToast('Add line items', true); return; }
 
+  // CA Cattle: every ticket on the invoice needs a valid 8000-series account code
+  if (isCACattle(data.customers.find(c => c.id === custId))) {
+    const ids = [...new Set(currentInvoiceLines.map(l => l._ticketId).filter(Boolean))];
+    const missing = ids.map(id => data.tickets.find(t => t.id === id))
+      .filter(t => t && !CA_ACCT_CODES.has(t.jobCode));
+    if (missing.length) {
+      showToast('Open ticket ' + missing.map(t => t.number).join(', ') + ' and pick an account code first', true);
+      return;
+    }
+  }
+
   const subOf = type => currentInvoiceLines.filter(l => l.type === type).reduce((s, l) => s + lineTotal(l), 0);
   const subtotalLabor = subOf('labor');
   const subtotalParts = subOf('part');
@@ -1645,7 +1740,7 @@ function renderInvoiceMockHTML(inv, cust) {
             <strong style="color:#00bfff; font-size:14px;">${escape(t.number)}</strong>
             <span style="margin-left:10px;">${escape(t.title || '')}</span>
           </div>
-          ${t.jobCode ? `<span style="font-size:11px; color:#a0d8ef;">Job code: ${escape(t.jobCode)}</span>` : ''}
+          ${t.jobCode ? `<span style="font-size:11px; color:#a0d8ef;">${escape(jobCodeLabel(t))}</span>` : ''}
         </div>
         ${hasEq ? `<div style="background:#f0f8fe; padding:6px 12px; font-size:12px;"><strong style="color:#0d1626;">EQUIPMENT:</strong> ${escape(eqStr)}</div>` : ''}
         <div style="padding:8px 12px;">
@@ -1994,7 +2089,7 @@ function generatePDF(inv, returnBlob) {
     doc.text(titleStr, M + 110, y + 13);
     if (ticket.jobCode) {
       setText(CYAN_LIGHT); doc.setFontSize(8);
-      doc.text('Job code: ' + ticket.jobCode, right - 8, y + 13, { align: 'right' });
+      doc.text(jobCodeLabel(ticket), right - 8, y + 13, { align: 'right' });
     }
     y += 20;
 
@@ -2176,7 +2271,8 @@ function generatePDF(inv, returnBlob) {
 
   if (returnBlob) {
     const blob = doc.output('blob');
-    return { blob, filename };
+    const bytes = new Uint8Array(doc.output('arraybuffer')); // sync — keeps iPhone tap "live" for share
+    return { blob, bytes, filename };
   }
 
   doc.save(filename);
@@ -2216,7 +2312,9 @@ async function emailInvoice(inv) {
   try {
     const result = generatePDF(inv, true); // returns { blob, filename }
     if (result && result.blob && navigator.canShare) {
-      const file = new File([result.blob], result.filename, { type: 'application/pdf' });
+      // v1.1.6: build the File from raw bytes instead of wrapping the Blob.
+      // iPhone Gmail was still pasting "blob:https://..." into the body in 1.1.5.
+      const file = new File([result.bytes], result.filename, { type: 'application/pdf', lastModified: Date.now() });
       const shareData = { files: [file] }; // file ONLY — no text, no title
       if (navigator.canShare(shareData)) {
         showToast('Opening share sheet — pick Mail');

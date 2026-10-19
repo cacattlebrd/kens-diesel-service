@@ -1,4 +1,4 @@
 {
-  "version": "1.1.5",
-  "notes": "Email button now shares only the PDF — fixes blob URL bug. Type your message in Mail."
+  "version": "1.1.6",
+  "notes": "CA Cattle tickets now require an account code from the list. Email fix for the blob:https line."
 }
