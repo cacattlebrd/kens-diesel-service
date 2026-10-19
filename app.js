@@ -1,7 +1,7 @@
 // Ken's Diesel Service - App Logic v2 (Ticket-based)
 // Phase 1: Local browser storage. Drive sync added later.
 
-const APP_VERSION = '1.1.6';
+const APP_VERSION = '1.1.7';
 const STORAGE_KEY = 'kens-mechanic-data';
 const SCHEMA_VERSION = 2;
 
@@ -644,41 +644,18 @@ document.getElementById('tickets-filter-status').addEventListener('change', appl
 let currentTicketId = null;
 
 // ---------------- CA CATTLE ACCOUNT CODES ----------------
-// 8000-series accounts from BRD Chart of Accounts (Xero, pulled 8-14-26).
-// Xero system accounts (8100B, 8199, 8200R) left out on purpose.
+// Repair/maintenance accounts from BRD Chart of Accounts (Xero, pulled 8-14-26).
+// v1.1.7: trimmed to repair codes only + "Not sure" catch-all (Chad codes it).
 // For CA Cattle tickets Ken MUST pick one of these — no free typing.
 const CA_CATTLE_ACCOUNTS = [
-  ['8000', 'Salaries Bakery'],
-  ['8001', 'Salaries-Bakery-Overtime'],
-  ['8005', 'Bakery Contract Labor'],
-  ['8012', 'Bakery Office Expenses'],
-  ['8013', 'Bakery Purchases'],
-  ['8014', 'Bakery Freight'],
-  ['8020', 'Bakery Fuel'],
-  ['8035', 'Bakery Lease'],
-  ['8045', 'Bakery Management Expense'],
-  ['8049', 'Bakery Miscellaneous'],
   ['8050', 'Bakery Maintenance and Repair'],
   ['8052', 'Bakery Repairs - Reconserve'],
   ['8055', 'Bakery Mill Supplies / Parts'],
   ['8060', 'Bakery Skid Steer Maintenance and Repair'],
   ['8062', 'Bakery Trailer Maintenance and Repair'],
   ['8064', 'Bakery Semi-Truck Maintenance and Repair'],
-  ['8065', 'Bakery Semi-Truck Lease'],
   ['8068', 'Bakery Company Pickups'],
-  ['8070', 'Bakery Supplies'],
-  ['8080', 'Bakery Analysis and Testing'],
-  ['8102', 'Bakery Scale Tickets'],
-  ['8115', 'Taxes - Other'],
-  ['8117', 'Bakery Payroll Taxes'],
-  ['8150', 'Bakery Utilities'],
-  ['8152', 'Bakery Trash'],
-  ['8154', 'Bakery Internet, Telephone and Computer'],
-  ['8160', 'Bakery Bank and Merchant Fees'],
-  ['8502', 'Bakery Insurance Costs'],
-  ['8503', 'Bakery Professional Services'],
-  ['8504', 'Bakery Safety'],
-  ['8505', 'Bakery DOT Expenses']
+  ['UNSURE', 'Not sure — CA Cattle will code it']
 ];
 const CA_ACCT_CODES = new Set(CA_CATTLE_ACCOUNTS.map(a => a[0]));
 
@@ -697,6 +674,7 @@ function jobCodeLabel(ticket) {
   if (!ticket || !ticket.jobCode) return '';
   const cust = data.customers.find(c => c.id === ticket.customerId);
   if (isCACattle(cust) && CA_ACCT_CODES.has(ticket.jobCode)) {
+    if (ticket.jobCode === 'UNSURE') return 'Acct: Not sure - CA Cattle to code';
     return 'Acct ' + ticket.jobCode + ' - ' + acctName(ticket.jobCode).replace(/^Bakery /, '');
   }
   return 'Job code: ' + ticket.jobCode;
@@ -714,7 +692,9 @@ function syncJobCodeField() {
 function fillAcctSelect(selected) {
   const sel = document.getElementById('tk-acct');
   sel.innerHTML = '<option value="">— Pick account code —</option>' +
-    CA_CATTLE_ACCOUNTS.map(a => `<option value="${a[0]}">${a[0]} — ${a[1]}</option>`).join('');
+    CA_CATTLE_ACCOUNTS.map(a => a[0] === 'UNSURE'
+      ? `<option value="${a[0]}">${a[1]}</option>`
+      : `<option value="${a[0]}">${a[0]} — ${a[1]}</option>`).join('');
   sel.value = CA_ACCT_CODES.has(selected) ? selected : '';
 }
 

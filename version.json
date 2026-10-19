@@ -1,4 +1,4 @@
 {
-  "version": "1.1.6",
-  "notes": "CA Cattle tickets now require an account code from the list. Email fix for the blob:https line."
+  "version": "1.1.7",
+  "notes": "CA Cattle account list trimmed to repair codes. Added 'Not sure' option."
 }
